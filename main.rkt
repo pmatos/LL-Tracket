@@ -17,51 +17,78 @@
 #lang racket/base
 ;; ---------------------------------------------------------------------------------------------------
 
-(require racket/function
-         racket/string
-         )
+(require plot/no-gui
+         racket/function
+         racket/list
+         racket/string)
 
 ;; ---------------------------------------------------------------------------------------------------
 
+(define data #false)
+
 (define (read-current-memory-use pid)
-  (call-with-input-file "/proc/~a/statm"
-    (lambda (in)
-      (define l (read-line in))
+  (with-input-from-file (format "/proc/~a/statm" pid)
+    (thunk
+     (second
+      (regexp-match #px"^([0-9]+) [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+$"
+                    (read-line))))))
 
-
-(define (track-subprocess pid [every 0.1])
+(define (track-subprocess pid [every 0.001])
   (define start (current-inexact-milliseconds))
-  (let loop ([lst '()])
+  (let loop ([lst (list (cons start (read-current-memory-use pid)))])
     (sync (handle-evt
            (thread-receive-evt)
-           (lambda (_) (void)))
+           (lambda (_) (set! data lst)))
           (handle-evt
            (alarm-evt (+ (current-inexact-milliseconds) (* every 1000)))
            (lambda (_)
              (define mem (read-current-memory-use pid))
-             (loop (cons (- (current-inexact-milliseconds) start)
-                         mem)))))))
+             (sleep every)
+             (loop (cons (cons (- (current-inexact-milliseconds) start)
+                               mem)
+                         lst)))))))
+
+(define (plot-to-file path data)
+  (plot-file (lines (for/list ([p (in-list data)])
+                      (list (car p) (string->number (cdr p)))))
+             path))
 
 (define (run-cmd cmd)
-  (printf "Running command line ~a~n"
-          (string-join cmd))
+
+  (define exe (first cmd))
+  (define args (rest cmd))
+
+  (define exepath
+    (if (absolute-path? exe)
+        exe
+        (path->string (find-executable-path exe))))
+
+  (printf "Running command line ~a ~a~n"
+          exepath (string-join args))
 
   (define-values (sp out in err)
     (apply subprocess
            (current-output-port)
            (current-input-port)
            (current-error-port)
-           cmd))
+           exepath args))
 
   (define monitor
     (thread
      (thunk (track-subprocess (subprocess-pid sp)))))
-  (define exitcode (subprocess-wait sp))
+  (subprocess-wait sp)
+  (define exitcode (subprocess-status sp))
 
   (thread-send monitor 'done)
+  (thread-wait monitor)
 
-  (unless (zero? exit)
-    (fprintf (current-error-port) "Process exited with non-zero output: ~a~n" exitcode)))
+  (unless (zero? exitcode)
+    (fprintf (current-error-port) "Process exited with non-zero output: ~a~n" exitcode))
+
+  (when data
+    (printf "Process finished, gathered ~a records~n" (length data))
+    (printf "Maximum memory requested: ~a~n" (apply max (map (compose string->number cdr) data)))
+    (plot-to-file "plot.png" data)))
 
 (module+ main
 
