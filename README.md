@@ -43,3 +43,17 @@ $ /home/pmatos/Projects/recidivm-0.2/recidivm ../../WebKitBuild/Release/bin/jsc 
 
 As you can see they provide very close values. They will never be precise or exactly the same due to the way Linux does memory allocation. We are measuring virtual memory assigned to the process calculated in pages. For example, if you allocate 10bytes the system will grant you at least a page, which on my system is 4096 bytes therefore even though the accurate memory requested is 10bytes, the application will report 4096 bytes as being allocated by the application (the memory page is the atomic unit of allocation in a virtual memory OS).
 
+## Example with racket
+
+Curious how much memory `racket` requires to start, evaluate `(exit)` and finish? Wonder no more...
+
+```
+$ racket main.rkt racket -e '(exit)'
+Running command line /home/pmatos/installs/racket-7.3/bin/racket -e (exit)
+Page size for your system is 4096 bytes
+Tracking process 32074
+Process finished (in 345.0ms), gathered 171 records
+Maximum virtual memory used: 270.92Mb
+```
+
+That would be just over 270Mb, taking 345ms on my machine.
