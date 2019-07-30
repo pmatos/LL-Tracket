@@ -1,6 +1,6 @@
 all: tracket
 
 tracket: main.rkt
-	raco exe -o tracket main.rkt
+	raco exe --vv -o tracket main.rkt
 
 
