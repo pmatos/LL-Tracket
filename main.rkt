@@ -81,7 +81,7 @@
    #:y-min 0
    #:title "Virtual Memory Allocation"
    #:x-label "Time (ms)"
-   #:y-lavel "Mem (Mb)"
+   #:y-label "Mem (Mb)"
    path))
 
 
