@@ -17,14 +17,22 @@
 #lang racket/base
 ;; ---------------------------------------------------------------------------------------------------
 
-(require plot/no-gui
+(require ffi/unsafe
+         plot/no-gui
+         racket/format
          racket/function
+         json
          racket/list
+         racket/match
          racket/string)
 
 ;; ---------------------------------------------------------------------------------------------------
 
-(define data #false)
+; Command line argument parameters
+(define p/write-json (make-parameter #false))
+(define p/write-plot (make-parameter #false))
+
+(define get-page-size (get-ffi-obj "getpagesize" #false (_fun -> _int)))
 
 (define (read-current-memory-use pid)
   (with-input-from-file (format "/proc/~a/statm" pid)
@@ -33,12 +41,14 @@
       (regexp-match #px"^([0-9]+) [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+$"
                     (read-line))))))
 
-(define (track-subprocess pid [every 0.001])
+(define (track-subprocess parent pid [every 0.001])
+  (printf "Tracking process ~a~n" pid)
   (define start (current-inexact-milliseconds))
-  (let loop ([lst (list (cons start (read-current-memory-use pid)))])
+  (let loop ([lst (list (cons 0 (read-current-memory-use pid)))])
     (sync (handle-evt
            (thread-receive-evt)
-           (lambda (_) (set! data lst)))
+           (lambda (_)
+             (thread-send parent (list lst start (current-inexact-milliseconds)))))
           (handle-evt
            (alarm-evt (+ (current-inexact-milliseconds) (* every 1000)))
            (lambda (_)
@@ -48,10 +58,32 @@
                                mem)
                          lst)))))))
 
+(define (json-to-file path data)
+  (define fdata
+    (for/list ([p (in-list data)])
+      (list (car p) (cdr p))))
+  (with-output-to-file path
+    (thunk (write-json fdata))
+    #:exists 'replace))
+
 (define (plot-to-file path data)
-  (plot-file (lines (for/list ([p (in-list data)])
-                      (list (car p) (string->number (cdr p)))))
-             path))
+  (define fdata
+    (for/list ([p (in-list data)])
+      (list (car p) (cdr p))))
+  (plot-file
+   (list
+    (lines fdata)
+    (points fdata
+            #:alpha 0.4
+            #:sym 'fullcircle1
+            #:color "black"))
+   #:x-min 0
+   #:y-min 0
+   #:title "Virtual Memory Allocation"
+   #:x-label "Time (ms)"
+   #:y-lavel "Mem (Mb)"
+   path))
+
 
 (define (run-cmd cmd)
 
@@ -65,6 +97,8 @@
 
   (printf "Running command line ~a ~a~n"
           exepath (string-join args))
+  (define pagesize (get-page-size))
+  (printf "Page size for your system is ~a bytes~n" pagesize)
 
   (define-values (sp out in err)
     (apply subprocess
@@ -73,22 +107,37 @@
            (current-error-port)
            exepath args))
 
+  (define parent (current-thread))
   (define monitor
     (thread
-     (thunk (track-subprocess (subprocess-pid sp)))))
+     (thunk (track-subprocess parent (subprocess-pid sp)))))
   (subprocess-wait sp)
   (define exitcode (subprocess-status sp))
 
   (thread-send monitor 'done)
+  (match-define (list data start end) (thread-receive))
   (thread-wait monitor)
 
   (unless (zero? exitcode)
     (fprintf (current-error-port) "Process exited with non-zero output: ~a~n" exitcode))
 
   (when data
-    (printf "Process finished, gathered ~a records~n" (length data))
-    (printf "Maximum memory requested: ~a~n" (apply max (map (compose string->number cdr) data)))
-    (plot-to-file "plot.png" data)))
+    (printf "Process finished (in ~ams), gathered ~a records~n"
+            (round (- end start))
+            (length data))
+
+    ;; Tranform size into Megabytes
+    (define rdata
+      (for/list ([p (in-list data)])
+        (cons (car p)
+              (exact->inexact (/ (* pagesize (string->number (cdr p)))
+                                 (* 1024 1024))))))
+    (printf "Maximum virtual memory used: ~aMb~n" (~r (apply max (map cdr rdata))
+                                                      #:precision 2))
+    (when (p/write-plot)
+      (plot-to-file (p/write-plot) rdata))
+    (when (p/write-json)
+      (json-to-file (p/write-json) rdata))))
 
 (module+ main
 
@@ -97,6 +146,11 @@
   (define cmd
     (command-line
      #:program "ll-tracket"
+     #:once-each
+     [("-p" "--plot") path "Plot memory allocation over time"
+                      (p/write-plot path)]
+     [("-j" "--json") path "Write data to json file"
+                      (p/write-json path)]
      #:args cmd
      cmd))
 
