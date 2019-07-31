@@ -52,11 +52,13 @@
           (handle-evt
            (alarm-evt (+ (current-inexact-milliseconds) (* every 1000)))
            (lambda (_)
-             (define mem (read-current-memory-use pid))
-             (sleep every)
-             (loop (cons (cons (- (current-inexact-milliseconds) start)
-                               mem)
-                         lst)))))))
+             (with-handlers ([exn:fail:filesystem:errno?
+                              (lambda (e) (loop lst))])
+               (define mem (read-current-memory-use pid))
+               (sleep every)
+               (loop (cons (cons (- (current-inexact-milliseconds) start)
+                                 mem)
+                           lst))))))))
 
 (define (json-to-file path data)
   (define fdata
