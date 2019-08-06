@@ -1,4 +1,4 @@
-;;     LL-Tracket is a low-level application performance tracket
+;;     LL-Tracket is a low-level application performance tracker
 ;;     Copyright (C) 2019 Paulo Matos
 
 ;;     This program is free software: you can redistribute it and/or modify
