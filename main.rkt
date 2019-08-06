@@ -132,9 +132,11 @@
     (fprintf (current-error-port) "Process exited with non-zero output: ~a~n" exitcode))
 
   (when data
-    (printf "Process finished (in ~ams), gathered ~a records~n"
+    (printf "Process finished (in ~ams), gathered ~a records (once every ~ams)~n"
             (round (- end start))
-            (length data))
+            (length data)
+            (~r (/ (round (- end start)) (length data))
+                #:precision 2))
 
     ;; Tranform size into Megabytes
     (define rdata
