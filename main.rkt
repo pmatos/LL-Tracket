@@ -41,7 +41,7 @@
   (with-input-from-file (format "/proc/~a/statm" pid)
     (thunk
      (second
-      (regexp-match #px"^([0-9]+) [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+$"
+      (regexp-match #px"^[0-9]+ ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+$"
                     (read-line))))))
 
 (define (track-subprocess parent pid [every (/ (p/ms-interval) 1000.0)])
