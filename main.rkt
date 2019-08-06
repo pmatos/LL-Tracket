@@ -31,8 +31,11 @@
 ; Command line argument parameters
 (define p/write-json (make-parameter #false))
 (define p/write-plot (make-parameter #false))
+(define p/output-to-stdout (make-parameter #false))
+(define p/ms-interval (make-parameter 500)) ; half a second by default
 
 (define get-page-size (get-ffi-obj "getpagesize" #false (_fun -> _int)))
+(define pagesize (get-page-size))
 
 (define (read-current-memory-use pid)
   (with-input-from-file (format "/proc/~a/statm" pid)
@@ -41,7 +44,7 @@
       (regexp-match #px"^([0-9]+) [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+$"
                     (read-line))))))
 
-(define (track-subprocess parent pid [every 0.001])
+(define (track-subprocess parent pid [every (/ (p/ms-interval) 1000.0)])
   (printf "Tracking process ~a~n" pid)
   (define start (current-inexact-milliseconds))
   (let loop ([lst (list (cons 0 (read-current-memory-use pid)))])
@@ -55,9 +58,15 @@
              (with-handlers ([exn:fail:filesystem:errno?
                               (lambda (e) (loop lst))])
                (define mem (read-current-memory-use pid))
+               (define now (current-inexact-milliseconds))
+               (when (p/output-to-stdout)
+                 (printf "~a ~a~n"
+                         now
+                         (~r (/ (* pagesize (string->number mem))
+                                (* 1024 1024))
+                             #:precision 2)))
                (sleep every)
-               (loop (cons (cons (- (current-inexact-milliseconds) start)
-                                 mem)
+               (loop (cons (cons (- now start) mem)
                            lst))))))))
 
 (define (json-to-file path data)
@@ -99,7 +108,6 @@
 
   (printf "Running command line ~a ~a~n"
           exepath (string-join args))
-  (define pagesize (get-page-size))
   (printf "Page size for your system is ~a bytes~n" pagesize)
 
   (define-values (sp out in err)
@@ -149,6 +157,10 @@
     (command-line
      #:program "ll-tracket"
      #:once-each
+     [("-i" "--interval") interval "Interval in milliseconds to check memory usage (default: 500)"
+                          (p/ms-interval (string->number interval))]
+     [("-o" "--stdout") "Output results to stdout"
+                        (p/output-to-stdout #true)]
      [("-p" "--plot") path "Plot memory allocation over time"
                       (p/write-plot path)]
      [("-j" "--json") path "Write data to json file"
