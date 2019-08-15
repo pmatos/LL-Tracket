@@ -32,4 +32,5 @@ Output: racket-exit.png
 ```
 
 The file `racket-exit.png` will look similar to the following (if not, consider reporting an issue):
-![Racket initialization time comparison][imgs/racket-exit.png]
+
+[[https://github.com/pmatos/LL-Tracket/blob/master/imgs/racket-exit.png|alt=Racket initialization time comparison]] 
