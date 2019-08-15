@@ -8,52 +8,28 @@ This is it, it will give you the maximum memory size used by an application, plo
 
 ## Usage
 
-To analyse the amount of memory used by the JetStream2 benchmark when ran with WebKit's JSC I ran from the JetStream2 benchmark folder:
+As a usage example, lets say we want to compare the memory usage by racket initialization using versions 6.12, 7.1, 7.3 and 7.4CS  (chosen because they have reasonable differences both in time and in memory requirements).
 
-``` 
-$ racket ~/Projects/ll-tracket/main.rkt ../../WebKitBuild/Release/bin/jsc -e "testList=['WSL']" cli.js
+We can run each of them separately using
+```
+$ ./tracket -j racket74cs.json -i 1 /home/pmatos/installs/racket-7.4_cs/bin/racket -e '(exit)'
+Running command line /home/pmatos/installs/racket-7.4_cs/bin/racket -e (exit)
 Page size for your system is 4096 bytes
-Tracking process 26636
-Starting JetStream2
-Running WSL:
-    Stdlib: 1.334
-    Tests: 0.471
-    Score: 0.793
-    Wall time: 0:14.379
-
-
-Stdlib: 1.334
-MainRun: 0.471
-
-Total Score:  0.793 
-
-Process finished (in 14434.0ms), gathered 7132 records
-Maximum virtual memory used: 1885.32Mb
+Tracking process 25897
+Process finished (in 443.0ms), gathered 192 records (once every 2.31ms)
+Maximum virtual memory used: 437.35Mb
 ```
 
-This will probably only work on Linux at the moment due to the way I get the page size (using `getpagesize`). I am happy to get PRs to make it portable.
-
-I have double-checked these values with [`recidivm`](https://github.com/jwilk/recidivm) (suggested by `afl-fuzz`).
-For example, for the same run above:
-
+Run once for each version, gather the json and then do:
 ```
-$ /home/pmatos/Projects/recidivm-0.2/recidivm ../../WebKitBuild/Release/bin/jsc -e "testList=['WSL']" cli.js
-1853739008
-```
-
-As you can see they provide very close values. They will never be precise or exactly the same due to the way Linux does memory allocation. We are measuring virtual memory assigned to the process calculated in pages. For example, if you allocate 10bytes the system will grant you at least a page, which on my system is 4096 bytes therefore even though the accurate memory requested is 10bytes, the application will report 4096 bytes as being allocated by the application (the memory page is the atomic unit of allocation in a virtual memory OS).
-
-## Example with racket
-
-Curious how much memory `racket` requires to start, evaluate `(exit)` and finish? Wonder no more...
-
-```
-$ racket main.rkt racket -e '(exit)'
-Running command line /home/pmatos/installs/racket-7.3/bin/racket -e (exit)
-Page size for your system is 4096 bytes
-Tracking process 32074
-Process finished (in 345.0ms), gathered 171 records
-Maximum virtual memory used: 270.92Mb
+$ ./tracket-cmp --output racket-exit.png Racket6.12:racket612.json Racket7.1:racket71.json Racket7.3:racket73.json RacketCS7.4:racket74cs.json
+Comparing:
+Racket6.12: racket612.json
+Racket7.1: racket71.json
+Racket7.3: racket73.json
+RacketCS7.4: racket74cs.json
+Output: racket-exit.png
 ```
 
-That would be just over 270Mb, taking 345ms on my machine.
+The file `racket-exit.png` will look similar to the following (if not, consider reporting an issue):
+![Racket initialization time comparison][imgs/racket-exit.png]
