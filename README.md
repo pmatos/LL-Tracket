@@ -34,3 +34,7 @@ Output: racket-exit.png
 The file `racket-exit.png` will look similar to the following (if not, consider reporting an issue):
 
 ![Racket init timing](https://github.com/pmatos/LL-Tracket/blob/master/imgs/racket-exit.png)
+
+## Disclaimer
+
+This software is in its infancy, its results might be correct, off-by-one, off-by-many or totally wrong. I am dog-fooding this on a daily basis but cross-referencing with other tools. At least for my current experiments, the results match what I expect and what other tools report but then again, it might all be a big coincidence. :)
