@@ -44,6 +44,12 @@
       (regexp-match #px"^[0-9]+ ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+$"
                     (read-line))))))
 
+;; To track a procedure we will probably have to play the game where we
+;; actually degenerate into tracking a racket subprocess that executes the
+;; procedure. We actually lift the thunk to be at the top-level of a module,
+;; and call it.
+(define (track-procedure thunk)
+
 (define (track-subprocess parent pid [every (/ (p/ms-interval) 1000.0)])
   (printf "Tracking process ~a~n" pid)
   (define start (current-inexact-milliseconds))
